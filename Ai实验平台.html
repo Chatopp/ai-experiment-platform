@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>AI辅助生物实验 (探究版)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet" />
+    <style>
+        :root {
+            --primary-color: #007bff; --success-color: #28a745; --warning-color: #ffc107;
+            --error-color: #dc3545; --light-gray: #f8f9fa; --gray: #e9ecef;
+            --text-color: #343a40; --border-color: #dee2e6; --ai-blue: #4a90e2;
+            --liquid-base-color: #cde6f9; --liquid-enzyme-color: #f5e6cc; --liquid-final-mix-color: #d1e0e0;
+            --temp-cold: #a0d8ef; --temp-warm: #f7b7a3; --temp-hot: #e67e7e;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: #f0f2f5; margin: 0; padding: 1.5rem; display: flex; justify-content: center; user-select: none; }
+        #app { display: grid; grid-template-columns: 1fr 2fr 1.2fr; gap: 1.5rem; width: 100%; max-width: 1900px; }
+        .card { background-color: #fff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); padding: 1.5rem; display: flex; flex-direction: column; }
+        .card h2 { margin-top: 0; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 0.75rem; font-size: 1.25rem; display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
+        .card h2 .title-icon-group { display: flex; align-items: center; gap: 0.5rem; }
+        
+        #left-panel { display: flex; flex-direction: column; min-height: 0; }
+        .tabs { display: flex; border-bottom: 1px solid var(--border-color); margin-bottom: 1rem; flex-shrink: 0; }
+        .tab-button { padding: 0.75rem 1rem; cursor: pointer; border: none; background: none; font-size: 1rem; font-weight: 500; color: #6c757d; border-bottom: 3px solid transparent; }
+        .tab-button.active { color: var(--primary-color); border-bottom-color: var(--primary-color); }
+        .tab-content { display: none; flex-grow: 1; overflow-y: auto; padding-right: 0.5rem; }
+        .tab-content.active { display: flex; flex-direction: column; }
+        
+        #experiment-progress { font-size: 0.9rem; font-weight: bold; background-color: var(--gray); color: var(--primary-color); padding: 0.2rem 0.6rem; border-radius: 1rem; }
+
+        .collapsible-section { border-bottom: 1px solid var(--border-color); margin-bottom: 0.5rem; }
+        .collapsible-section:last-of-type { border-bottom: none; }
+        .collapsible-section summary { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; cursor: pointer; font-size: 1.1rem; font-weight: 600; color: var(--primary-color); list-style: none; }
+        .collapsible-section summary::-webkit-details-marker { display: none; }
+        .collapsible-section summary .title-text { display: flex; align-items: center; gap: 0.5rem; }
+        .collapsible-section summary .toggle-icon { transition: transform 0.3s ease; color: #6c757d; }
+        details[open] > summary .toggle-icon { transform: rotate(180deg); }
+        .collapsible-section .collapsible-content { padding: 0.25rem 0 1rem 1.5rem; line-height: 1.6; }
+        .collapsible-content ul { padding-left: 1.25rem; margin: 0; }
+        .collapsible-content li { margin-bottom: 0.5rem; }
+
+        #procedure-steps .step { padding: 0.8rem; margin-bottom: 0.5rem; border: 1px solid var(--border-color); border-radius: 8px; font-weight: 500; display: flex; justify-content: space-between; align-items: center; transition: all 0.3s ease; }
+        .step .step-text { flex-grow: 1; }
+        .step .step-score { font-weight: bold; color: var(--text-color); background-color: var(--gray); padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.85rem;}
+        .step.active { border-left: 4px solid var(--primary-color); background-color: #e7f3ff; }
+        .step.completed { background-color: #eaf6ec; border-left: 4px solid var(--success-color); }
+        .step.completed .step-score { background-color: var(--success-color); color: white; }
+
+        #student-log-entries { flex-grow: 1; overflow-y: auto; padding-right: 0.5rem; }
+        .log-entry { margin-bottom: 1rem; padding-left: 1.5rem; border-left: 3px solid var(--border-color); position: relative; }
+        .log-entry::before { content: ''; font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; left: -11px; top: 0; background: white; border-radius: 50%; width: 22px; height: 22px; display: grid; place-items: center; border: 2px solid var(--border-color); font-size: 0.8em; }
+        .log-entry.success::before { content: '\f2c5'; color: var(--success-color); border-color: var(--success-color); }
+        .log-entry.error::before { content: '\f071'; color: var(--error-color); border-color: var(--error-color); }
+        .log-entry.info::before { content: '\f129'; color: var(--primary-color); border-color: var(--primary-color); }
+        .log-entry p { margin: 0 0 0.25rem 0; }
+        .log-entry .log-text { font-weight: 500; }
+        .log-entry .log-reason { font-size: 0.85rem; color: #6c757d; font-style: italic; }
+        .log-entry .log-score { font-weight: bold; color: var(--success-color); }
+
+        #lab-bench-top { display: flex; gap: 2rem; justify-content: center; align-items: flex-end; height: 280px; padding: 1rem; background: linear-gradient(#e9ecef, #d8dce0); border-radius: 8px; position: relative; }
+        .test-tube { width: 50px; height: 180px; border: 3px solid #6c757d; border-top: none; border-radius: 0 0 25px 25px; position: relative; background-color: #fff; box-shadow: inset 2px 0 10px rgba(0,0,0,0.1); transition: transform 0.3s ease, box-shadow 0.3s, border-color 0.3s; cursor: pointer; overflow: hidden; }
+        .test-tube.selected-for-tool { border-color: var(--ai-blue); transform: translateY(-10px); box-shadow: 0 5px 15px rgba(74, 144, 226, 0.4); }
+        .liquid { position: absolute; bottom: 0; left: 0; width: 100%; height: 0; background-color: var(--liquid-base-color); border-radius: 0 0 22px 22px; transition: height 0.5s ease-out, background-color 0.5s ease; }
+        .tube-label { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: white; padding: 2px 8px; border: 1px solid #aaa; border-radius: 4px; font-weight: bold; z-index: 2; }
+        .tube-condition-indicator { position: absolute; bottom: 5px; left: 50%; transform: translateX(-50%); font-size: 1.5rem; opacity: 0; transition: opacity 0.5s; }
+        .tube-condition-indicator.visible { opacity: 0.7; }
+        .bubbles { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .bubble { position: absolute; background: rgba(255, 255, 255, 0.6); border-radius: 50%; bottom: 10px; animation: rise 4s infinite ease-in; }
+        @keyframes rise { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-170px); opacity: 0; } }
+        .reagent-added-flash { animation: flash-effect 0.6s ease-out; }
+        @keyframes flash-effect { 0% { box-shadow: inset 2px 0 10px rgba(0,0,0,0.1), 0 0 0px var(--ai-blue); } 50% { box-shadow: inset 2px 0 10px rgba(0,0,0,0.1), 0 0 25px 8px var(--ai-blue); } 100% { box-shadow: inset 2px 0 10px rgba(0,0,0,0.1), 0 0 0px var(--ai-blue); } }
+        .hint-highlight { animation: pulse-glow 1.5s infinite ease-in-out; }
+        @keyframes pulse-glow { 0% { box-shadow: 0 0 0 0 rgba(74, 144, 226, 0.7); } 70% { box-shadow: 0 0 15px 10px rgba(74, 144, 226, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 144, 226, 0); } }
+
+        #lab-bench-bottom { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; align-items: flex-start; }
+        .reagent-rack, .tool-rack { display: flex; flex-direction: column; align-items: center; }
+        .tool-rack h3, .reagent-rack h3 { margin: 0 0 1rem 0; text-align: center; }
+        .reagent-container, .tool-container { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+        .reagent-bottle, .tool-item { display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: transform 0.2s; text-align: center; }
+        .reagent-bottle.active-tool, .tool-item.active-tool { transform: scale(1.1); color: var(--primary-color); }
+        .reagent-bottle:hover, .tool-item:hover, #start-reaction-button:not(.hidden):hover { transform: scale(1.1); }
+        .reagent-bottle-icon, .tool-icon { width: 60px; height: 90px; border: 2px solid #888; border-radius: 8px 8px 4px 4px; position: relative; display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #555; background: #f1f1f1; margin-bottom: 0.5rem; transition: all 0.3s ease; }
+        .tool-icon { background: #e0e0e0; }
+        .reagent-bottle-icon.active-tool, .tool-icon.active-tool { border-color: var(--primary-color); box-shadow: 0 0 10px var(--primary-color); }
+        .reagent-bottle-icon::before { content: ''; position: absolute; top: -10px; left: 50%; transform: translateX(-50%); width: 30px; height: 10px; background: #555; border-radius: 4px 4px 0 0; }
+        .reagent-label { font-size: 0.85rem; font-weight: 500; }
+        #dropper-status { position: absolute; top: 1.5rem; left: 1.5rem; background: rgba(255,255,255,0.9); padding: 0.5rem 1rem; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); font-weight: 500; border: 1px solid var(--border-color); opacity: 0; transition: opacity 0.3s; z-index: 5; }
+        #dropper-status.visible { opacity: 1; }
+        .hidden { display: none !important; }
+
+        #feedback-area { background-color: var(--gray); border-radius: 8px; padding: 1rem; height: 150px; overflow-y: auto; border: 1px solid var(--border-color); margin-bottom: 1rem; }
+        .message { padding: 0.75rem; border-radius: 6px; margin-bottom: 0.5rem; }
+        .message.info { background-color: #cfe2ff; color: #052c65; }
+        .message.success { background-color: #d1e7dd; color: #0a3622; }
+        .message.error { background-color: #f8d7da; color: #58151a; font-weight: 500; }
+        #student-data-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center; margin-bottom: 1rem; }
+        .data-box { background-color: var(--light-gray); padding: 1rem; border-radius: 8px; }
+        .data-box .label { font-size: 0.9rem; color: #6c757d; }
+        .data-box .value { font-size: 1.5rem; font-weight: bold; }
+        #final-score { color: var(--primary-color); } #final-time { color: #6c757d; } #error-count { color: var(--error-color); }
+        
+        #ai-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: auto; }
+        .ai-btn { background-color: var(--primary-color); color: white; border: none; padding: 0.75rem 1rem; border-radius: 8px; font-weight: bold; cursor: pointer; width: 100%; transition: background-color 0.2s; }
+        .ai-btn:hover { opacity: 0.9; }
+        #ai-hint-button { background-color: var(--ai-blue); }
+        #reset-button { background-color: var(--error-color); }
+
+        .overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.95); backdrop-filter: blur(5px); z-index: 10; display: flex; align-items: center; justify-content: center; padding: 1rem; }
+        .overlay.hidden { display: none; }
+        #selection-modal { text-align: center; max-width: 800px; }
+        #selection-modal h2 { font-size: 2.5rem; color: var(--primary-color); margin-bottom: 1rem; }
+        #selection-modal p { font-size: 1.2rem; color: #6c757d; margin-bottom: 2.5rem; }
+        .selection-buttons { display: flex; gap: 2rem; justify-content: center; }
+        .selection-btn { background: #fff; border: 2px solid var(--border-color); border-radius: 12px; padding: 1.5rem 2rem; cursor: pointer; transition: all 0.3s ease; width: 200px; }
+        .selection-btn:hover { transform: translateY(-10px); border-color: var(--ai-blue); box-shadow: 0 10px 20px rgba(0,0,0,0.1); }
+        .selection-btn i { font-size: 3rem; color: var(--ai-blue); margin-bottom: 1rem; display: block; }
+        .selection-btn span { font-size: 1.1rem; font-weight: 600; color: var(--text-color); }
+
+        #ai-review-report { width: 95%; max-width: 700px; max-height: 95vh; overflow-y: auto; background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.15); border: 1px solid var(--border-color); text-align: center; }
+        #ai-review-report h3 { color: var(--ai-blue); font-size: 1.8rem; margin: 0 0 1rem 0; }
+        #ai-review-report .score-display { font-size: 4rem; font-weight: bold; color: var(--primary-color); margin-bottom: 1rem; }
+        #ai-review-report .review-section { text-align: left; margin-top: 1.5rem; }
+        #ai-review-report .review-section h4 { border-bottom: 2px solid var(--ai-blue); padding-bottom: 0.5rem; font-size: 1.1rem; }
+        #ai-review-report .review-section ul { list-style: none; padding-left: 0; }
+        #ai-review-report .review-section li { margin-bottom: 0.5rem; padding-left: 1.5rem; position: relative; line-height: 1.5; }
+        #ai-review-report .review-section li::before { font-family: "Font Awesome 6 Free"; font-weight: 900; position: absolute; left: 0; top: 4px; }
+        #ai-review-report .review-section .good-point::before { content: '\f00c'; color: var(--success-color); }
+        #ai-review-report .review-section .bad-point::before { content: '\f071'; color: var(--error-color); }
+        #ai-review-report #efficiency-review { font-style: italic; color: #333; margin-top: 1rem; padding: 1rem; background: var(--gray); border-radius: 8px; }
+        #results-table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+        #results-table th, #results-table td { border: 1px solid var(--border-color); padding: 0.75rem; text-align: center; }
+        #results-table th { background-color: var(--light-gray); }
+        button#close-review { background: var(--ai-blue); color: white; border: none; padding: 0.75rem 2rem; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 2rem; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <!-- 列1: 实验手册 & 学生日志 -->
+    <div id="left-panel" class="card">
+        <div class="tabs">
+            <button class="tab-button active" data-tab="manual"><i class="fas fa-book-open"></i> 实验手册</button>
+            <button class="tab-button" data-tab="student-log"><i class="fas fa-user-graduate"></i> 我的实验记录</button>
+        </div>
+        <div id="manual-content" class="tab-content active">
+            <h2 id="experiment-title-container">
+                <div class="title-icon-group"><i class="fas fa-flask"></i> <span id="experiment-title"></span></div>
+                <span id="experiment-progress">0%</span>
+            </h2>
+            <div id="manual-sections"></div>
+        </div>
+        <div id="student-log-content" class="tab-content">
+            <h2><div class="title-icon-group"><i class="fas fa-clipboard-list"></i> 我的实验记录</div></h2>
+            <div id="student-log-entries"></div>
+        </div>
+    </div>
+
+    <!-- 列2: 实验操作台 -->
+    <div id="lab-bench" class="card">
+         <h2><div class="title-icon-group"><i class="fas fa-vial"></i> 实验操作台</div></h2>
+        <div id="lab-bench-top">
+            <div id="test-tube-A" class="test-tube" data-tube-id="A"> <div class="liquid"></div> <div class="bubbles"></div> <div class="tube-condition-indicator"></div> <div class="tube-label">A</div> </div>
+            <div id="test-tube-B" class="test-tube" data-tube-id="B"> <div class="liquid"></div> <div class="bubbles"></div> <div class="tube-condition-indicator"></div> <div class="tube-label">B</div> </div>
+            <div id="test-tube-C" class="test-tube" data-tube-id="C"> <div class="liquid"></div> <div class="bubbles"></div> <div class="tube-condition-indicator"></div> <div class="tube-label">C</div> </div>
+            <div id="dropper-status">滴管为空</div>
+        </div>
+        <div id="lab-bench-bottom">
+            <div class="reagent-rack">
+                <h3><i class="fas fa-prescription-bottle"></i> 试剂架</h3>
+                <div class="reagent-container" id="reagent-container-dynamic"></div>
+            </div>
+            <div class="tool-rack">
+                <h3><i class="fas fa-tools"></i> 工具区</h3>
+                <div class="tool-container" id="tool-container-dynamic"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 列3: AI 助手与数据记录 -->
+    <div id="ai-assistant" class="card">
+        <h2><div class="title-icon-group"><i class="fas fa-robot"></i> AI 助手</div></h2>
+        <div id="feedback-area"></div>
+        <div id="student-data-grid">
+            <div class="data-box"><div class="label">当前得分</div><div class="value" id="final-score">0</div></div>
+            <div class="data-box"><div class="label">用时</div><div class="value" id="final-time">00:00</div></div>
+            <div class="data-box"><div class="label">失误次数</div><div class="value" id="error-count">0</div></div>
+        </div>
+        <div id="ai-controls">
+            <button id="ai-hint-button" class="ai-btn"><i class="fas fa-lightbulb"></i> AI提示下一步</button>
+            <button id="reset-button" class="ai-btn"><i class="fas fa-redo"></i> 重置实验</button>
+        </div>
+
+        <div id="ai-review-overlay" class="overlay hidden">
+            <div id="ai-review-report">
+                <h3><i class="fas fa-award"></i> AI 实验报告</h3>
+                <div class="score-display" id="review-score">100</div>
+                <div id="review-sections"></div>
+                <button id="close-review">完成复盘</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="experiment-selection-overlay" class="overlay">
+    <div id="selection-modal">
+        <h2>选择你的探究课题</h2>
+        <p>选择一个自变量，设计并完成你的实验吧！</p>
+        <div class="selection-buttons">
+            <button class="selection-btn" data-exp-type="ph">
+                <i class="fas fa-flask-vial"></i>
+                <span>探究pH值</span>
+            </button>
+            <button class="selection-btn" data-exp-type="temperature">
+                <i class="fas fa-thermometer-half"></i>
+                <span>探究温度</span>
+            </button>
+            <button class="selection-btn" data-exp-type="concentration">
+                <i class="fas fa-percentage"></i>
+                <span>探究底物浓度</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+
+    const dom = {
+        // UI Panels
+        app: document.getElementById('app'),
+        tabs: document.querySelectorAll('.tab-button'),
+        tabContents: document.querySelectorAll('.tab-content'),
+        // Left Panel
+        experimentTitle: document.getElementById('experiment-title'),
+        experimentProgress: document.getElementById('experiment-progress'),
+        manualSections: document.getElementById('manual-sections'),
+        stepsContainer: null, 
+        studentLogEntries: document.getElementById('student-log-entries'),
+        // Center Panel
+        reagentContainer: document.getElementById('reagent-container-dynamic'),
+        toolContainer: document.getElementById('tool-container-dynamic'),
+        testTubes: document.querySelectorAll('.test-tube'),
+        dropperStatus: document.getElementById('dropper-status'),
+        // Right Panel
+        feedbackArea: document.getElementById('feedback-area'),
+        finalScore: document.getElementById('final-score'),
+        finalTime: document.getElementById('final-time'),
+        errorCount: document.getElementById('error-count'),
+        resetButton: document.getElementById('reset-button'),
+        aiHintButton: document.getElementById('ai-hint-button'),
+        // Overlays
+        selectionOverlay: document.getElementById('experiment-selection-overlay'),
+        selectionButtons: document.querySelectorAll('.selection-btn'),
+        aiReviewOverlay: document.getElementById('ai-review-overlay'),
+        reviewScore: document.getElementById('review-score'),
+        reviewSections: document.getElementById('review-sections'),
+        closeReviewBtn: document.getElementById('close-review'),
+    };
+    
+    // --- START OF EXPERIMENT DEFINITIONS ---
+    
+    const EXPERIMENT_DEFINITIONS = {
+        ph: {
+            id: 'ph',
+            title: '探究pH对酶活性的影响',
+            manual: `
+                <details class="collapsible-section" open><summary><span class="title-text"><i class="fas fa-bullseye"></i> 实验目的</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content"><ul><li>探究pH值对过氧化氢酶(catalase)催化活性的影响。</li><li>学习设置对照实验和控制变量的方法。</li></ul></div></details>
+                <details class="collapsible-section"><summary><span class="title-text"><i class="fas fa-atom"></i> 实验原理</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content"><p>过氧化氢酶的最适pH约为7.0（中性）。过高或过低的pH会改变酶的空间结构，导致其活性降低甚至失活。本实验通过设置酸、中、碱三种环境，对比气泡产生速率，从而探究pH对酶活性的影响。</p></div></details>
+            `,
+            reagents: [
+                { id: 'catalase', name: '肝脏研磨液', icon: '<i class="fas fa-dna"></i>', hintKeyword: '肝脏' },
+                { id: 'hcl', name: '盐酸', icon: 'HCl', hintKeyword: '盐酸' },
+                { id: 'water', name: '清水', icon: '<i class="fas fa-tint"></i>', hintKeyword: '清水' },
+                { id: 'naoh', name: '氢氧化钠', icon: 'NaOH', hintKeyword: '氢氧化钠' },
+                { id: 'h2o2', name: 'H₂O₂溶液', icon: 'H₂O₂', hintKeyword: 'H₂O₂' }
+            ],
+            tools: [
+                { id: 'dropper', name: '滴管', icon: '<i class="fas fa-eye-dropper"></i>', hintKeyword: '滴管' },
+                { id: 'start_button', name: '开始反应', icon: '<i class="fas fa-play-circle"></i>', hidden: true, hintKeyword: '开始' }
+            ],
+            procedure: [
+                { id: 1, text: "向三支试管中各加入肝脏研磨液", score: 15, check: s => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.has('catalase')) },
+                { id: 2, text: "向试管A中加入清水 (中性对照)", score: 10, check: s => s.tubes.A.reagents.has('water') },
+                { id: 3, text: "向试管B中加入盐酸 (酸性条件)", score: 10, check: s => s.tubes.B.reagents.has('hcl') },
+                { id: 4, text: "向试管C中加入氢氧化钠 (碱性条件)", score: 10, check: s => s.tubes.C.reagents.has('naoh') },
+                { id: 5, text: "向三支试管中各加入H₂O₂溶液", score: 15, check: s => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.has('h2o2')) },
+                { id: 6, text: "点击“开始反应”按钮，观察现象", score: 10, check: s => s.hasStartedReaction },
+                { id: 7, text: "获得科学的实验结果", score: 30, check: s => s.isFinished && s.errorCount === 0 }
+            ],
+            getReadyState: (s) => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.size >= 3),
+            validateDrop: (reagent, tubeId, tubeState) => {
+                if (reagent !== 'catalase' && !tubeState.reagents.has('catalase')) return { valid: false, reason: `逻辑错误：应先向试管${tubeId}中加入作为酶的肝脏研磨液。` };
+                if (reagent === 'h2o2' && tubeState.reagents.size < 2) return { valid: false, reason: `逻辑错误：在设定pH值前，向试管${tubeId}加入了底物H₂O₂，这会使反应提前开始。` };
+                if (reagent === 'water' && tubeId !== 'A') return { valid: false, reason: `对照错误：清水(中性)是A管的条件，但被加入了试管${tubeId}。` };
+                if (reagent === 'hcl' && tubeId !== 'B') return { valid: false, reason: `对照错误：盐酸(酸性)是B管的条件，但被加入了试管${tubeId}。` };
+                if (reagent === 'naoh' && tubeId !== 'C') return { valid: false, reason: `对照错误：氢氧化钠(碱性)是C管的条件，但被加入了试管${tubeId}。` };
+                return { valid: true };
+            },
+            getFinalResults: (s) => ({
+                A: s.tubes.A.reagents.has('catalase') && s.tubes.A.reagents.has('water') && s.tubes.A.reagents.has('h2o2') ? 'high' : 'none',
+                B: s.tubes.B.reagents.has('catalase') && s.tubes.B.reagents.has('hcl') && s.tubes.B.reagents.has('h2o2') ? 'low' : 'none',
+                C: s.tubes.C.reagents.has('catalase') && s.tubes.C.reagents.has('naoh') && s.tubes.C.reagents.has('h2o2') ? 'low' : 'none',
+            }),
+            generateReview: (results, state) => {
+                const isCorrect = { A: results.A === 'high', B: results.B === 'low', C: results.C === 'low' };
+                let analysis = isCorrect.A && isCorrect.B && isCorrect.C 
+                    ? "你的实验结果与预期完全一致！A管（中性）产生大量气泡，B管（酸性）和C管（碱性）产生少量气泡。这充分证明了过氧化氢酶的最适pH在中性范围。"
+                    : "你的实验结果与预期存在偏差。<strong>预期结果</strong>是A管大量气泡，B、C管少量气泡。请回顾操作日志与下方失误分析，找出导致偏差的原因。";
+                
+                // Example of linking error to result
+                if (!isCorrect.B && state.studentLog.some(e => e.text.includes("向试管B中加入了清水"))) {
+                    analysis += "<br><strong>[AI诊断]</strong> 检测到您可能将清水加入了B管，导致B管环境为中性而非酸性，因此现象与A管类似。";
+                }
+
+                return `
+                    <div class="review-section">
+                        <h4><i class="fas fa-poll-h"></i> 实验结果与分析</h4>
+                        <table id="results-table">
+                            <thead><tr><th>试管</th><th>设置条件 (pH)</th><th>预期现象</th><th>你的结果</th></tr></thead>
+                            <tbody>
+                                <tr><td>A</td><td>中性 (清水)</td><td>大量气泡</td><td>${isCorrect.A ? '大量气泡' : '现象不符'} <i class="fas ${isCorrect.A ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.A ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                                <tr><td>B</td><td>酸性 (HCl)</td><td>少量气泡</td><td>${isCorrect.B ? '少量气泡' : '现象不符'} <i class="fas ${isCorrect.B ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.B ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                                <tr><td>C</td><td>碱性 (NaOH)</td><td>少量气泡</td><td>${isCorrect.C ? '少量气泡' : '现象不符'} <i class="fas ${isCorrect.C ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.C ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                            </tbody>
+                        </table>
+                        <p style="margin-top: 1rem;"><strong>结果分析:</strong> ${analysis}</p>
+                    </div>`;
+            }
+        },
+        temperature: {
+            id: 'temperature',
+            title: '探究温度对酶活性的影响',
+            manual: `<details class="collapsible-section" open><summary><span class="title-text"><i class="fas fa-bullseye"></i> 实验目的</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content"><ul><li>探究温度对过氧化氢酶催化活性的影响。</li><li>理解最适温度、低温抑制和高温变性的概念。</li></ul></div></details><details class="collapsible-section"><summary><span class="title-text"><i class="fas fa-atom"></i> 实验原理</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content"><p>温度影响酶的活性。在最适温度（约37℃）下，酶活性最高。低温会抑制酶的活性，但通常是可逆的。高温会破坏酶的空间结构，导致其永久失活（变性）。</p></div></details>`,
+            reagents: [
+                { id: 'catalase', name: '肝脏研磨液', icon: '<i class="fas fa-dna"></i>', hintKeyword: '肝脏' },
+                { id: 'h2o2', name: 'H₂O₂溶液', icon: 'H₂O₂', hintKeyword: 'H₂O₂' }
+            ],
+            tools: [
+                { id: 'dropper', name: '滴管', icon: '<i class="fas fa-eye-dropper"></i>', hintKeyword: '滴管' },
+                { id: 'bath_0', name: '0℃ 冰浴', icon: '<i class="fas fa-snowflake"></i>', hintKeyword: '冰浴' },
+                { id: 'bath_37', name: '37℃ 恒温', icon: '<i class="fas fa-thermometer-half"></i>', hintKeyword: '恒温' },
+                { id: 'bath_100', name: '100℃ 沸水', icon: '<i class="fas fa-fire"></i>', hintKeyword: '沸水' },
+                { id: 'start_button', name: '开始反应', icon: '<i class="fas fa-play-circle"></i>', hidden: true, hintKeyword: '开始' }
+            ],
+            procedure: [
+                { id: 1, text: "向三支试管中各加入肝脏研磨液", score: 20, check: s => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.has('catalase')) },
+                { id: 2, text: "将三支试管置于不同温度下处理", score: 20, check: s => ['A', 'B', 'C'].every(t => s.tubes[t].condition) },
+                { id: 3, text: "向三支试管中各加入H₂O₂溶液", score: 20, check: s => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.has('h2o2')) },
+                { id: 4, text: "点击“开始反应”按钮，观察现象", score: 10, check: s => s.hasStartedReaction },
+                { id: 5, text: "获得科学的实验结果", score: 30, check: s => s.isFinished && s.errorCount === 0 }
+            ],
+            getReadyState: (s) => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.size >= 2 && s.tubes[t].condition),
+            validateDrop: (reagent, tubeId, tubeState) => {
+                if (reagent === 'h2o2' && !tubeState.condition) return { valid: false, reason: `逻辑错误：应先对试管进行温度处理，再加入底物H₂O₂。否则无法探究温度对酶活性的影响。` };
+                return { valid: true };
+            },
+            getFinalResults: (s) => {
+                const results = {};
+                for (const tubeId of ['A', 'B', 'C']) {
+                    const tube = s.tubes[tubeId];
+                    if (tube.reagents.has('catalase') && tube.reagents.has('h2o2')) {
+                        if (tube.condition === 'bath_37') results[tubeId] = 'high';
+                        else if (tube.condition === 'bath_0') results[tubeId] = 'low';
+                        else if (tube.condition === 'bath_100') results[tubeId] = 'none';
+                        else results[tubeId] = 'none'; // Untreated
+                    } else {
+                        results[tubeId] = 'none';
+                    }
+                }
+                return results;
+            },
+            generateReview: (results, state) => {
+                const tubeFor37 = Object.keys(state.tubes).find(t => state.tubes[t].condition === 'bath_37') || '未设置';
+                const tubeFor0 = Object.keys(state.tubes).find(t => state.tubes[t].condition === 'bath_0') || '未设置';
+                const tubeFor100 = Object.keys(state.tubes).find(t => state.tubes[t].condition === 'bath_100') || '未设置';
+
+                const isCorrect = {
+                    high: tubeFor37 !== '未设置' && results[tubeFor37] === 'high',
+                    low: tubeFor0 !== '未设置' && results[tubeFor0] === 'low',
+                    none: tubeFor100 !== '未设置' && results[tubeFor100] === 'none',
+                };
+                let analysis = (isCorrect.high && isCorrect.low && isCorrect.none)
+                    ? "你的实验结果与预期完全一致！37℃下酶活性最高，0℃下活性被抑制，100℃下酶已变性失活。这清晰地展示了温度对酶活性的影响。"
+                    : "你的实验结果与预期存在偏差。<strong>预期结果</strong>是37℃管大量气泡，0℃管少量气泡，100℃管无气泡。请回顾操作。";
+                
+                return `<div class="review-section">
+                        <h4><i class="fas fa-poll-h"></i> 实验结果与分析</h4>
+                        <table id="results-table">
+                            <thead><tr><th>设置条件 (温度)</th><th>指定试管</th><th>预期现象</th><th>你的结果</th></tr></thead>
+                            <tbody>
+                                <tr><td>37℃ (最适)</td><td>${tubeFor37}</td><td>大量气泡</td><td>${isCorrect.high ? '大量气泡' : '现象不符'} <i class="fas ${isCorrect.high ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.high ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                                <tr><td>0℃ (低温)</td><td>${tubeFor0}</td><td>少量气泡</td><td>${isCorrect.low ? '少量气泡' : '现象不符'} <i class="fas ${isCorrect.low ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.low ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                                <tr><td>100℃ (高温)</td><td>${tubeFor100}</td><td>无气泡</td><td>${isCorrect.none ? '无气泡' : '现象不符'} <i class="fas ${isCorrect.none ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.none ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                            </tbody>
+                        </table>
+                        <p style="margin-top: 1rem;"><strong>结果分析:</strong> ${analysis}</p>
+                    </div>`;
+            }
+        },
+        concentration: {
+            id: 'concentration',
+            title: '探究底物浓度对酶活性的影响',
+            manual: `<details class="collapsible-section" open><summary><span class="title-text"><i class="fas fa-bullseye"></i> 实验目的</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content"><ul><li>探究底物(H₂O₂)浓度对酶促反应速率的影响。</li><li>理解在酶量一定时，反应速率与底物浓度的关系。</li></ul></div></details><details class="collapsible-section"><summary><span class="title-text"><i class="fas fa-atom"></i> 实验原理</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content"><p>在酶浓度、温度、pH等条件适宜且固定的情况下，反应速率会随着底物浓度的增加而加快。但当底物浓度达到一定值后，由于酶的数量有限，反应速率将不再增加，达到饱和点。</p></div></details>`,
+            reagents: [
+                { id: 'catalase', name: '肝脏研磨液', icon: '<i class="fas fa-dna"></i>', hintKeyword: '肝脏' },
+                { id: 'h2o2_1', name: '1% H₂O₂', icon: '1% H₂O₂', hintKeyword: '1% H₂O₂' },
+                { id: 'h2o2_3', name: '3% H₂O₂', icon: '3% H₂O₂', hintKeyword: '3% H₂O₂' },
+                { id: 'h2o2_5', name: '5% H₂O₂', icon: '5% H₂O₂', hintKeyword: '5% H₂O₂' }
+            ],
+            tools: [
+                { id: 'dropper', name: '滴管', icon: '<i class="fas fa-eye-dropper"></i>', hintKeyword: '滴管' },
+                { id: 'start_button', name: '开始反应', icon: '<i class="fas fa-play-circle"></i>', hidden: true, hintKeyword: '开始' }
+            ],
+            procedure: [
+                { id: 1, text: "向三支试管中各加入肝脏研磨液", score: 25, check: s => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.has('catalase')) },
+                { id: 2, text: "向A管加入1% H₂O₂", score: 10, check: s => s.tubes.A.reagents.has('h2o2_1') },
+                { id: 3, text: "向B管加入3% H₂O₂", score: 10, check: s => s.tubes.B.reagents.has('h2o2_3') },
+                { id: 4, text: "向C管加入5% H₂O₂", score: 10, check: s => s.tubes.C.reagents.has('h2o2_5') },
+                { id: 5, text: "点击“开始反应”按钮，观察现象", score: 15, check: s => s.hasStartedReaction },
+                { id: 6, text: "获得科学的实验结果", score: 30, check: s => s.isFinished && s.errorCount === 0 }
+            ],
+            getReadyState: (s) => ['A', 'B', 'C'].every(t => s.tubes[t].reagents.size >= 2),
+            validateDrop: (reagent, tubeId, tubeState) => {
+                if (reagent.startsWith('h2o2') && !tubeState.reagents.has('catalase')) return { valid: false, reason: `逻辑错误：应先向试管${tubeId}中加入酶，再加入底物。` };
+                if (reagent === 'h2o2_1' && tubeId !== 'A') return { valid: false, reason: `对照错误：1% H₂O₂ 应加入 A 管。` };
+                if (reagent === 'h2o2_3' && tubeId !== 'B') return { valid: false, reason: `对照错误：3% H₂O₂ 应加入 B 管。` };
+                if (reagent === 'h2o2_5' && tubeId !== 'C') return { valid: false, reason: `对照错误：5% H₂O₂ 应加入 C 管。` };
+                return { valid: true };
+            },
+            getFinalResults: (s) => ({
+                A: s.tubes.A.reagents.has('catalase') && s.tubes.A.reagents.has('h2o2_1') ? 'low' : 'none',
+                B: s.tubes.B.reagents.has('catalase') && s.tubes.B.reagents.has('h2o2_3') ? 'medium' : 'none',
+                C: s.tubes.C.reagents.has('catalase') && s.tubes.C.reagents.has('h2o2_5') ? 'high' : 'none',
+            }),
+            generateReview: (results, state) => {
+                const isCorrect = { A: results.A === 'low', B: results.B === 'medium', C: results.C === 'high' };
+                let analysis = (isCorrect.A && isCorrect.B && isCorrect.C) 
+                    ? "你的实验结果清晰地表明，随着底物浓度升高，反应速率加快。这与酶促反应动力学理论完全一致。"
+                    : "你的实验结果与预期存在偏差。<strong>预期结果</strong>是气泡产生速率 C > B > A。请检查是否加入了正确的浓度的底物到对应的试管中。";
+                return `<div class="review-section">
+                        <h4><i class="fas fa-poll-h"></i> 实验结果与分析</h4>
+                        <table id="results-table">
+                            <thead><tr><th>试管</th><th>设置条件 (底物浓度)</th><th>预期现象</th><th>你的结果</th></tr></thead>
+                            <tbody>
+                                <tr><td>A</td><td>1% H₂O₂</td><td>少量气泡</td><td>${isCorrect.A ? '少量气泡' : '现象不符'} <i class="fas ${isCorrect.A ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.A ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                                <tr><td>B</td><td>3% H₂O₂</td><td>中量气泡</td><td>${isCorrect.B ? '中量气泡' : '现象不符'} <i class="fas ${isCorrect.B ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.B ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                                <tr><td>C</td><td>5% H₂O₂</td><td>大量气泡</td><td>${isCorrect.C ? '大量气泡' : '现象不符'} <i class="fas ${isCorrect.C ? 'fa-check-circle' : 'fa-times-circle'}" style="color:${isCorrect.C ? 'var(--success-color)' : 'var(--error-color)'}"></i></td></tr>
+                            </tbody>
+                        </table>
+                        <p style="margin-top: 1rem;"><strong>结果分析:</strong> ${analysis}</p>
+                    </div>`;
+            }
+        },
+    };
+    
+    // --- END OF EXPERIMENT DEFINITIONS ---
+
+    let labState;
+    let procedure = [];
+    let currentConfig = null;
+
+    function initLabState(config) {
+        currentConfig = config;
+        procedure = JSON.parse(JSON.stringify(config.procedure));
+        labState = {
+            experimentType: config.id, activeTool: null, dropperContent: null, selectedTube: null,
+            tubes: { A: { reagents: new Set(), condition: null }, B: { reagents: new Set(), condition: null }, C: { reagents: new Set(), condition: null } },
+            score: 0, errorCount: 0, studentLog: [], startTime: null, timerInterval: null, elapsedTime: 0,
+            isFinished: false, hasStartedReaction: false,
+        };
+    }
+
+    function startTimer() {
+        if (labState.timerInterval) clearInterval(labState.timerInterval);
+        labState.startTime = new Date();
+        labState.timerInterval = setInterval(() => {
+            if (labState.isFinished) return;
+            labState.elapsedTime = Math.round((new Date() - labState.startTime) / 1000);
+            const minutes = Math.floor(labState.elapsedTime / 60).toString().padStart(2, '0');
+            const seconds = (labState.elapsedTime % 60).toString().padStart(2, '0');
+            dom.finalTime.textContent = `${minutes}:${seconds}`;
+        }, 1000);
+    }
+    
+    function addStudentLog(type, text, reason = '') { labState.studentLog.unshift({ type, text, reason }); updateStudentLogView(); }
+    function giveFeedback(message, type = 'info') { const el = document.createElement('div'); el.className = `message ${type}`; el.innerHTML = `<i class="fas ${type === 'error' ? 'fa-exclamation-circle' : 'fa-info-circle'}"></i> ${message}`; dom.feedbackArea.insertBefore(el, dom.feedbackArea.firstChild); dom.feedbackArea.scrollTop = 0; }
+    function recordError(reason, studentMessage) { if (labState.isFinished) return; labState.errorCount++; dom.errorCount.textContent = labState.errorCount; giveFeedback(studentMessage, 'error'); addStudentLog('error', reason, `AI提示: ${studentMessage}`); }
+
+    function checkAllStepsCompletion() {
+        let completedCount = 0;
+        for (const step of procedure) {
+            if (!step.completed && step.check && step.check(labState)) {
+                step.completed = true;
+                labState.score += step.score; dom.finalScore.textContent = labState.score;
+                addStudentLog('success', `完成了 "${step.text}"`, `操作正确，<span class="log-score">[+${step.score}分]</span>`);
+            }
+            if(step.completed) completedCount++;
+        }
+        renderProcedure();
+
+        const progress = Math.round((completedCount / procedure.length) * 100);
+        dom.experimentProgress.textContent = `${progress}%`;
+        
+        const isReady = currentConfig.getReadyState(labState);
+        if (isReady && !labState.isFinished && !labState.hasStartedReaction) {
+            document.getElementById('tool-item-start_button')?.classList.remove('hidden');
+            giveFeedback("所有试剂已添加完毕！请点击【开始反应】按钮启动实验。", "success");
+        }
+    }
+
+    function handleReagentDrop(reagentId, reagentName, tubeId) {
+        if (labState.isFinished || labState.hasStartedReaction) return;
+        const tubeState = labState.tubes[tubeId];
+        
+        if (tubeState.reagents.has(reagentId)) { 
+            giveFeedback(`操作重复：试管${tubeId}中已经有${reagentName}了。`, 'warning');
+            return;
+        }
+
+        const validation = currentConfig.validateDrop(reagentId, tubeId, tubeState);
+        if (!validation.valid) {
+            recordError(`在试管${tubeId}中错误地加入了${reagentName}`, validation.reason);
+        }
+
+        addStudentLog('info', `向试管 ${tubeId} 加入了 ${reagentName}。`);
+        tubeState.reagents.add(reagentId);
+        
+        const tubeEl = document.getElementById(`test-tube-${tubeId}`);
+        const liquidEl = tubeEl.querySelector('.liquid');
+        liquidEl.style.height = `${(tubeState.reagents.size * 15) + (tubeState.condition ? 10 : 0)}%`;
+        
+        if(reagentId === 'catalase') liquidEl.style.backgroundColor = 'var(--liquid-enzyme-color)';
+        else liquidEl.style.backgroundColor = 'var(--liquid-final-mix-color)';
+
+        tubeEl.classList.add('reagent-added-flash');
+        setTimeout(() => tubeEl.classList.remove('reagent-added-flash'), 600);
+        
+        checkAllStepsCompletion();
+    }
+    
+    function handleToolClick(toolId, toolEl) {
+        if (labState.activeTool && labState.activeTool.id !== toolId) {
+            document.getElementById(`tool-item-${labState.activeTool.id}`)?.classList.remove('active-tool');
+        }
+        
+        toolEl.classList.toggle('active-tool');
+        if (!toolEl.classList.contains('active-tool')) {
+            labState.activeTool = null;
+            giveFeedback("已取消选择工具。");
+            return;
+        }
+
+        labState.activeTool = { id: toolId, type: toolId.split('_')[0] };
+
+        switch(labState.activeTool.type) {
+            case 'dropper':
+                dom.dropperStatus.classList.add('visible');
+                giveFeedback("已选择滴管。请点击试剂瓶吸取液体。", "info");
+                break;
+            case 'bath':
+                giveFeedback(`已选择 ${toolEl.querySelector('.reagent-label').textContent}。请点击一个试管进行处理。`, "info");
+                break;
+            case 'start':
+                handleStartReactionClick();
+                toolEl.classList.remove('active-tool');
+                labState.activeTool = null;
+                break;
+        }
+    }
+    
+    function handleTestTubeClick(tubeId) {
+        if (!labState.activeTool) return;
+
+        const tubeEl = document.getElementById(`test-tube-${tubeId}`);
+        switch(labState.activeTool.type) {
+            case 'dropper':
+                if (!labState.dropperContent) {
+                    giveFeedback("滴管是空的，请先从试剂架上吸取试剂。", "warning");
+                    return;
+                }
+                handleReagentDrop(labState.dropperContent.id, labState.dropperContent.name, tubeId);
+                break;
+            case 'bath':
+                if (labState.tubes[tubeId].condition) {
+                    giveFeedback(`试管 ${tubeId} 已经用 ${labState.tubes[tubeId].condition.replace('bath_', '')+'℃'} 处理过了。`, 'warning');
+                    return;
+                }
+                labState.tubes[tubeId].condition = labState.activeTool.id;
+                addStudentLog('info', `对试管 ${tubeId} 进行了 ${labState.activeTool.id.replace('bath_', '')}℃ 温度处理。`);
+                
+                const indicator = tubeEl.querySelector('.tube-condition-indicator');
+                indicator.innerHTML = { bath_0: '<i class="fas fa-snowflake"></i>', bath_37: '<i class="fas fa-thermometer-half"></i>', bath_100: '<i class="fas fa-fire"></i>' }[labState.activeTool.id];
+                indicator.style.color = { bath_0: 'var(--temp-cold)', bath_37: 'var(--temp-warm)', bath_100: 'var(--temp-hot)' }[labState.activeTool.id];
+                indicator.classList.add('visible');
+                checkAllStepsCompletion();
+                break;
+        }
+    }
+
+    function handleStartReactionClick() {
+        if (labState.isFinished || labState.hasStartedReaction) return;
+        labState.hasStartedReaction = true;
+        document.getElementById('tool-item-start_button').classList.add('hidden');
+        checkAllStepsCompletion();
+        labState.isFinished = true;
+        clearInterval(labState.timerInterval);
+        const results = currentConfig.getFinalResults(labState);
+        Object.keys(results).forEach(tubeId => showBubbles(tubeId, results[tubeId]));
+        checkAllStepsCompletion();
+        addStudentLog('success', '实验结束，正在生成AI点评报告...');
+        setTimeout(() => showAIReview(results), 3000);
+    }
+    
+    function provideHint() {
+        // Clear previous hints
+        document.querySelectorAll('.hint-highlight').forEach(el => el.classList.remove('hint-highlight'));
+
+        const nextStep = procedure.find(step => !step.completed);
+        if (!nextStep) {
+            giveFeedback("你已经完成了所有步骤！点击“开始反应”吧！", "success");
+            const startBtn = document.getElementById('tool-item-start_button');
+            if (startBtn) startBtn.classList.add('hint-highlight');
+            return;
+        }
+
+        giveFeedback(`<strong>提示:</strong> ${nextStep.text}`, "info");
+
+        // Visual hint logic
+        const allItems = [...currentConfig.reagents, ...currentConfig.tools];
+        const itemToHint = allItems.find(item => item.hintKeyword && nextStep.text.includes(item.hintKeyword));
+        
+        if (itemToHint) {
+            let elementToHighlight;
+            if (currentConfig.reagents.includes(itemToHint)) {
+                elementToHighlight = document.querySelector(`.reagent-bottle[data-reagent-id="${itemToHint.id}"] .reagent-bottle-icon`);
+            } else if (currentConfig.tools.includes(itemToHint)) {
+                elementToHighlight = document.querySelector(`.tool-item[data-tool-id="${itemToHint.id}"] .tool-icon`);
+            }
+            if (elementToHighlight) {
+                elementToHighlight.classList.add('hint-highlight');
+                setTimeout(() => elementToHighlight.classList.remove('hint-highlight'), 3000);
+            }
+        }
+    }
+
+    function showBubbles(tubeId, intensity = 'low') {
+        const bubbleContainer = document.querySelector(`#test-tube-${tubeId} .bubbles`);
+        if (!bubbleContainer) return;
+        const counts = { low: 8, medium: 16, high: 25, none: 0 };
+        const durations = { low: 4, medium: 3, high: 2, none: 0 };
+        for (let i = 0; i < counts[intensity]; i++) {
+            const bubble = document.createElement('span');
+            bubble.className = 'bubble';
+            const size = Math.random() * 8 + 4;
+            bubble.style.width = `${size}px`; bubble.style.height = `${size}px`;
+            bubble.style.left = `${Math.random() * 85}%`;
+            bubble.style.animationDuration = `${Math.random() * 1.5 + durations[intensity]}s`;
+            bubble.style.animationDelay = `${Math.random() * 2}s`;
+            bubbleContainer.appendChild(bubble);
+        }
+    }
+    
+    function showAIReview(results) {
+        dom.reviewScore.textContent = labState.score;
+        let goodPoints = [], badPoints = [], efficiencyReview, criticalErrorsHtml = '';
+
+        if (labState.errorCount === 0) goodPoints.push("操作零失误，实验步骤清晰准确，非常专业！");
+        if (labState.score >= 90) goodPoints.push("实验结果与理论预期一致，结论可靠，表现出色！");
+        if (goodPoints.length === 0) goodPoints.push("虽然过程有些曲折，但你坚持完成了实验，这是最重要的第一步！");
+        
+        const criticalErrors = labState.studentLog.filter(log => log.type === 'error');
+        if (criticalErrors.length > 0) {
+            badPoints.push(`本次实验共出现 ${criticalErrors.length} 处关键失误，请查看下方的详细回顾。`);
+            criticalErrorsHtml = `<div class="review-section">
+                <h4><i class="fas fa-search-plus"></i> 关键失误回顾</h4>
+                <ul>${criticalErrors.map(e => `<li class="bad-point">${e.reason}</li>`).join('')}</ul>
+            </div>`;
+        } else {
+            badPoints.push("你的表现非常出色，无可挑剔！");
+        }
+        
+        const standardTime = procedure.length * 15;
+        const timeRatio = labState.elapsedTime / standardTime;
+        if (timeRatio < 1.1 && labState.errorCount < 2) efficiencyReview = "高效准确：你的操作非常熟练，且用时合理，堪称典范！";
+        else if (timeRatio < 1.5) efficiencyReview = "操作熟练：实验用时合理，可以在保证准确性的前提下，进一步提升速度。";
+        else efficiencyReview = "有待提速：本次实验耗时较长，可能是对流程不太熟悉或失误较多导致。多练习几次会更好！";
+        
+        const resultHTML = currentConfig.generateReview(results, labState);
+
+        dom.reviewSections.innerHTML = `
+            ${resultHTML}
+            ${criticalErrorsHtml}
+            <div class="review-section"><h4><i class="fas fa-thumbs-up"></i> 表现亮点</h4><ul>${goodPoints.map(p => `<li class="good-point">${p}</li>`).join('')}</ul></div>
+            <div class="review-section"><h4><i class="fas fa-lightbulb"></i> 改进建议</h4><ul>${badPoints.map(p => `<li class="bad-point">${p}</li>`).join('')}</ul></div>
+            <div id="efficiency-review"><strong>效率评价：</strong>${efficiencyReview}</div>
+        `;
+        dom.aiReviewOverlay.classList.remove('hidden');
+    }
+    
+    function renderProcedure() {
+        dom.stepsContainer.innerHTML = procedure.map(step => `
+            <div class="step ${step.completed ? 'completed' : ''}" data-step-id="${step.id}">
+                <span class="step-text"><i class="fas ${step.completed ? 'fa-check-circle' : 'fa-flask'}"></i> ${step.text}</span>
+                <span class="step-score">+${step.score}分</span>
+            </div>
+        `).join('');
+        const firstUncompleted = procedure.find(p => !p.completed);
+        if (firstUncompleted) document.querySelector(`.step[data-step-id='${firstUncompleted.id}']`)?.classList.add('active');
+    }
+
+    function updateStudentLogView() {
+        dom.studentLogEntries.innerHTML = labState.studentLog.map(e => `
+            <div class="log-entry ${e.type}">
+                <p class="log-text">${e.text}</p>
+                ${e.reason ? `<p class="log-reason">${e.reason}</p>` : ''}
+            </div>`).join('');
+        dom.studentLogEntries.scrollTop = 0;
+    }
+    
+    function initializeExperiment(type) {
+        const config = EXPERIMENT_DEFINITIONS[type];
+        if (!config) return;
+        
+        dom.selectionOverlay.classList.add('hidden');
+        if (labState && labState.timerInterval) clearInterval(labState.timerInterval);
+        
+        initLabState(config);
+
+        dom.experimentTitle.textContent = config.title;
+        dom.manualSections.innerHTML = config.manual + `<details class="collapsible-section" open><summary><span class="title-text"><i class="fas fa-list-ol"></i> 实验步骤 (总分100)</span><i class="fas fa-chevron-down toggle-icon"></i></summary><div class="collapsible-content" style="padding-left: 0;"><div id="procedure-steps"></div></div></details>`;
+        dom.stepsContainer = document.getElementById('procedure-steps');
+        renderProcedure();
+        
+        dom.reagentContainer.innerHTML = config.reagents.map(r => `<div class="reagent-bottle" data-reagent-id="${r.id}" title="吸取${r.name}"><div class="reagent-bottle-icon">${r.icon}</div><span class="reagent-label">${r.name}</span></div>`).join('');
+        dom.toolContainer.innerHTML = config.tools.map(t => `<div id="tool-item-${t.id}" class="tool-item ${t.hidden ? 'hidden' : ''}" data-tool-id="${t.id}" title="${t.name}"><div class="tool-icon">${t.icon}</div><span class="reagent-label">${t.name}</span></div>`).join('');
+
+        dom.feedbackArea.innerHTML = ''; dom.studentLogEntries.innerHTML = '';
+        dom.finalScore.textContent = '0'; dom.finalTime.textContent = '00:00'; dom.errorCount.textContent = '0';
+        dom.experimentProgress.textContent = '0%';
+        dom.dropperStatus.classList.remove('visible'); dom.dropperStatus.textContent = "滴管为空";
+        dom.aiReviewOverlay.classList.add('hidden');
+        dom.testTubes.forEach(tubeEl => {
+            tubeEl.querySelector('.liquid').style.height = '0%';
+            tubeEl.querySelector('.liquid').style.backgroundColor = 'var(--liquid-base-color)';
+            tubeEl.querySelector('.bubbles').innerHTML = '';
+            tubeEl.querySelector('.tube-condition-indicator').classList.remove('visible');
+            tubeEl.classList.remove('selected-for-tool');
+        });
+        
+        startTimer();
+        giveFeedback(`实验开始：${config.title}。请按步骤操作，如果遇到困难，可以点击“AI提示下一步”哦！`, "info");
+        addStudentLog('info', `新实验开始：${config.title}`);
+    }
+
+    function main() {
+        dom.tabs.forEach(tab => tab.addEventListener('click', () => { dom.tabs.forEach(t => t.classList.remove('active')); dom.tabContents.forEach(c => c.classList.remove('active')); tab.classList.add('active'); document.getElementById(`${tab.dataset.tab}-content`).classList.add('active'); }));
+        dom.closeReviewBtn.addEventListener('click', () => dom.aiReviewOverlay.classList.add('hidden'));
+        dom.resetButton.addEventListener('click', () => dom.selectionOverlay.classList.remove('hidden'));
+        dom.aiHintButton.addEventListener('click', provideHint);
+
+        dom.selectionButtons.forEach(btn => btn.addEventListener('click', (e) => { initializeExperiment(e.currentTarget.dataset.expType); }));
+
+        dom.reagentContainer.addEventListener('click', e => {
+            const bottle = e.target.closest('.reagent-bottle');
+            if (!bottle || labState.activeTool?.type !== 'dropper') return;
+            const reagentId = bottle.dataset.reagentId;
+            const name = bottle.querySelector('.reagent-label').textContent;
+            labState.dropperContent = { id: reagentId, name: name };
+            dom.dropperStatus.textContent = `已吸取: ${name}`;
+        });
+
+        dom.toolContainer.addEventListener('click', e => {
+            const tool = e.target.closest('.tool-item');
+            if (tool) handleToolClick(tool.dataset.toolId, tool);
+        });
+
+        dom.testTubes.forEach(tube => tube.addEventListener('click', (e) => { handleTestTubeClick(e.currentTarget.dataset.tubeId); }));
+
+        dom.selectionOverlay.classList.remove('hidden');
+    }
+
+    main();
+});
+</script>
+
+</body>
+</html>
